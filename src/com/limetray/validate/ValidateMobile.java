@@ -87,6 +87,8 @@ public class ValidateMobile {
 			System.out.println("End time " + end);
 		} catch (SQLException e) {
 			e.printStackTrace();
+			System.out.println("Exception occurred, roll backing.");
+			connection.rollback();
 		} finally {
 
 			if (connection != null) {
