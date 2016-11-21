@@ -21,7 +21,7 @@ public class ValidateMobile {
 	private static String DB_CONNECTION = null;
 	private static String DB_USER = null;
 	private static String DB_PASSWORD = null;
-	private static int batchSize, maxRecords;
+	private static int batchSize, start, maxRecords;
 
 	public static void main(String[] argv) throws SQLException, ClassNotFoundException, IOException {
 
@@ -31,27 +31,34 @@ public class ValidateMobile {
 		ResultSet rs = null;
 		Connection connection = null;
 		int validCount = 0, inValidCount = 0;
-		Date start = new Date();
-		System.out.println("Start time " + start);
+		Date startDate = new Date();
+		System.out.println("Start time " + startDate);
+		
 		try {
 			connection = getConnection();
 			connection.setAutoCommit(false);
 
-			for (int i = 1; i < maxRecords; i = i + batchSize) {
+			String selectQuery = "select brand_user_id, primary_mobile, country_code from brand_user where brand_user_id between ? and ?";
+			selectPS = connection.prepareStatement(selectQuery);
+			String updateQuery = "update brand_user set primary_mobile = ?, country_code = ?, old_mobile = ?, old_country_code = ?, is_valid = ?, validity_reason = ? where brand_user_id = ?";
+			PreparedStatement updatePS = connection.prepareStatement(updateQuery);
+			
+			String brandUserID = null;
+			String oldMobile = null;
+			String oldCode = null;
+			
+			for (int i = start; i < maxRecords; i = i + batchSize) {
 				int end = i + batchSize - 1;
 				System.out.println("Processing data between id " + i + " and " + end);
-				String selectQuery = "select brand_user_id, primary_mobile, country_code from brand_user where brand_user_id between ? and ?";
-				selectPS = connection.prepareStatement(selectQuery);
+				
 				selectPS.setLong(1, i);
 				selectPS.setLong(2, end);
 				rs = selectPS.executeQuery();
 
-				String updateQuery = "update brand_user set primary_mobile = ?, country_code = ?, old_mobile = ?, old_country_code = ?, is_valid = ?, validity_reason = ? where brand_user_id = ?";
-				PreparedStatement updatePS = connection.prepareStatement(updateQuery);
 				while (rs.next()) {
-					String brandUserID = rs.getString(1);
-					String oldMobile = rs.getString(2);
-					String oldCode = rs.getString(3);
+					brandUserID = rs.getString(1);
+					oldMobile = rs.getString(2);
+					oldCode = rs.getString(3);
 
 					PhoneNumber number = validateMobileNumber(oldCode, oldMobile);
 					if (number != null) {
@@ -76,6 +83,10 @@ public class ValidateMobile {
 				}
 
 				updatePS.executeBatch();
+				
+				updatePS.clearBatch();
+				selectPS.clearBatch();
+				
 				System.out.println("Batch successfully processed.");
 				updatePS.close();
 			}
@@ -161,6 +172,7 @@ public class ValidateMobile {
 			DB_USER = prop.getProperty("DB_USER");
 			DB_PASSWORD = prop.getProperty("DB_PASSWORD");
 			batchSize = Integer.parseInt(prop.getProperty("batchSize"));
+			start = Integer.parseInt(prop.getProperty("start"));
 			maxRecords = Integer.parseInt(prop.getProperty("maxRecords"));
 		} catch (IOException ex) {
 			ex.printStackTrace();
